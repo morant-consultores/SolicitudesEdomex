@@ -36,6 +36,8 @@ golem::add_sass_file("custom")
 ## Add internal datasets ----
 ## If you have data in your package
 usethis::use_data_raw(name = "solicitudes", open = FALSE)
+usethis::use_data_raw(name = "etiquetas", open = FALSE)
+usethis::use_data_raw(name = "shp", open = FALSE)
 
 ## Tests ----
 ## Add one line by test you want to create
@@ -59,7 +61,7 @@ covrpage::covrpage()
 ## service for your application
 ##
 ## (You'll need GitHub there)
-usethis::use_github()
+usethis::use_github(organisation = "morant-consultores")
 
 # GitHub Actions
 usethis::use_github_action()
