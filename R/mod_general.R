@@ -21,16 +21,16 @@ mod_general_ui <- function(id){
           accordion_panel(
             "Variables",
             icon = bs_icon("sliders"),
-            selectInput(ns("acciones"),
+            selectInput(ns("accion"),
                         "Acciones",
                         choices = c("Todas" = "", sort(unique(solicitudes$etiqueta_1)))
             ),
-            selectInput(ns("etiqueta_1"),
-                        "Etiqueta 1",
-                        choices = c("Todas" = "", sort(unique(solicitudes$etiqueta_2)))
-            ),
             selectInput(ns("etiqueta_2"),
                         "Etiqueta 2",
+                        choices = c("Todas" = "", sort(unique(solicitudes$etiqueta_2)))
+            ),
+            selectInput(ns("etiqueta_3"),
+                        "Etiqueta 3",
                         choices = c("Todas" = "", sort(unique(solicitudes$etiqueta_3)))
             )
           ),
@@ -57,15 +57,21 @@ mod_general_ui <- function(id){
       layout_column_wrap(
         width = 1/2,
         height = 600,
-          card(
-            card_header("Mapa"),
-            leaflet::leafletOutput(ns("mapa")),
-            full_screen = T
-          ),
         card(
-          card_header("Informes por municipio"),
-          highcharter::highchartOutput(ns("g_1")),
+          card_header("Mapa"),
+          leaflet::leafletOutput(ns("mapa")),
           full_screen = T
+        ),
+        navset_card_tab(
+          full_screen = T,
+          nav_panel(
+            shiny::icon("chart-simple"),
+            highcharter::highchartOutput(ns("g_1"))
+          ),
+          nav_panel(
+            shiny::icon("chart-line"),
+            highcharter::highchartOutput(ns("g_3"))
+          )
         )
       ),
       layout_column_wrap(
@@ -93,6 +99,31 @@ mod_general_server <- function(id){
   moduleServer( id, function(input, output, session){
     ns <- session$ns
 
+    observeEvent(input$accion, {
+      req(input$accion != "")
+      aux <- solicitudes |>
+        filter(etiqueta_1 == input$accion) |>
+        pull(etiqueta_2) |>
+        unique() |>
+        sort()
+
+      updateSelectInput(session = session, "etiqueta_2", choices = c("Todas" = "", aux))
+      updateSelectInput(session = session, "etiqueta_3", choices = c("Todas" = "", sort(unique(solicitudes$etiqueta_3))))
+    })
+
+    observeEvent(input$etiqueta_2,{
+      req(input$etiqueta_2 != "")
+
+      aux <- solicitudes |>
+        filter(etiqueta_2 == input$etiqueta_2, etiqueta_1 == input$accion) |>
+        pull(etiqueta_3) |>
+        unique() |>
+        sort()
+
+      updateSelectInput(session = session, "etiqueta_3", choices = c("Todas" = "", aux))
+    })
+
+
     output$mapa <- leaflet::renderLeaflet({
       aux <- solicitudes |>
         count(municipio)
@@ -100,28 +131,28 @@ mod_general_server <- function(id){
       shp <- shp |>
         left_join(aux, join_by(nombre == municipio))
 
-      paleta <- colorRampPalette(c("#124559", "white", "#f77f00"))(10)
-      domain <- c(min(aux$n, na.rm = T), max(aux$n, na.rm = T))
-      pal <- colorNumeric(
-        palette = paleta,
-        domain = domain
-      )
+      # Aplicar transformación logarítmica (asegurándote de evitar log(0))
+      aux <- aux |>
+        mutate(log_n = ifelse(n > 0, log(n), 0))
+
+      domain <- c(min(aux$log_n, na.rm = TRUE), max(aux$log_n, na.rm = TRUE))
+      paleta <- colorNumeric(c("#124559", "white", "#f77f00"), domain = domain)
 
       leaflet(options = leafletOptions(zoomControl = FALSE)) |>
         addProviderTiles(provider = "CartoDB.Positron") |>
         addPolygons(data = shp,
                     weight = 1.5,
                     stroke = TRUE,
-                    color = "white",  # Establece el color de las líneas en gris
-                    fillColor = ~pal(n),
+                    color = "white",
+                    fillColor = ~paleta(aux$log_n),
                     opacity = 0.3,
                     label = ~ nombre,
-                    # popup = ~ label,
+                    popup = ~ paste0("<strong>Municipio:</strong> ", nombre,
+                                     "<br><strong>Solicitudes:</strong> ", n),
                     fillOpacity = 0.8) |>
-        addLegend('bottomright', pal = pal, values = domain,
-                  title = "Solicitudes") |>
+        addLegend('bottomright', pal = paleta, values = domain,
+                  title = "Solicitudes - Escaladas") |>
         leaflet.extras::addFullscreenControl()
-
     })
 
     output$g_1 <- renderHighchart({
