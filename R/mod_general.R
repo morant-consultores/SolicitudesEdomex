@@ -26,11 +26,11 @@ mod_general_ui <- function(id){
                         choices = c("Todas" = "", sort(unique(solicitudes$etiqueta_1)))
             ),
             selectInput(ns("etiqueta_2"),
-                        "Etiqueta 2",
+                        "Tema",
                         choices = c("Todas" = "", sort(unique(solicitudes$etiqueta_2)))
             ),
             selectInput(ns("etiqueta_3"),
-                        "Etiqueta 3",
+                        "Subtema",
                         choices = c("Todas" = "", sort(unique(solicitudes$etiqueta_3)))
             )
           ),

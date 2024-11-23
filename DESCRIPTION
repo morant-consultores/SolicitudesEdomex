@@ -19,10 +19,12 @@ Imports:
     highcharter,
     leaflet,
     leaflet.extras,
-    pkgload,
+    rlang,
+    scales,
     sf,
     shiny,
-    shinyWidgets
+    shinyWidgets,
+    stringr
 Suggests: 
     knitr,
     rmarkdown,
