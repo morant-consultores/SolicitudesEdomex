@@ -37,16 +37,11 @@ mod_general_ui <- function(id){
           accordion_panel(
             "Fecha",
             icon = bs_icon("geo-alt"),
-            shinyWidgets::airDatepickerInput(
-              inputId = ns("fecha"),
-              label = "Seleccione fecha:",
-              inline = TRUE,
-              value = c(min(solicitudes$fecha), max(solicitudes$fecha)),
-              minDate = min(solicitudes$fecha),
-              maxDate = max(solicitudes$fecha),
-              range = c(min(solicitudes$fecha), max(solicitudes$fecha)),
-              language = "es",
-              view = "months"
+            dateRangeInput(ns("fecha"),
+                           label = '',
+                           start = as.Date(min(solicitudes$fecha)),
+                           end = as.Date(max(solicitudes$fecha)),
+                           language = "es", separator = "a"
             ),
           )
         ),
@@ -99,6 +94,7 @@ mod_general_server <- function(id){
   moduleServer( id, function(input, output, session){
     ns <- session$ns
 
+# Reactividad -------------------------------------------------------------
     observeEvent(input$accion, {
       req(input$accion != "")
       aux <- solicitudes |>
@@ -115,7 +111,14 @@ mod_general_server <- function(id){
       req(input$etiqueta_2 != "")
 
       aux <- solicitudes |>
-        filter(etiqueta_2 == input$etiqueta_2, etiqueta_1 == input$accion) |>
+        filter(etiqueta_2 == input$etiqueta_2)
+
+      if(input$accion != ""){
+        aux <- aux |>
+          filter(etiqueta_1 == input$accion)
+      }
+
+      aux <- aux |>
         pull(etiqueta_3) |>
         unique() |>
         sort()
@@ -123,9 +126,38 @@ mod_general_server <- function(id){
       updateSelectInput(session = session, "etiqueta_3", choices = c("Todas" = "", aux))
     })
 
+    tema_var <- reactive({
+      input$filtrar
+      if (isolate(input$etiqueta_2) != "") {
+        "etiqueta_3"
+      } else {
+        "etiqueta_2"
+      }
+    })
+
+    bd <- reactive({
+      input$filtrar
+      aux <- solicitudes |>
+        filter(fecha >= isolate(input$fecha)[1] & fecha <= isolate(input$fecha)[2])
+      if(isolate(input$accion) != ""){
+        aux <- aux |>
+          filter(etiqueta_1 == isolate(input$accion))
+      }
+      if(isolate(input$etiqueta_2) != ""){
+        aux <- aux |>
+          filter(etiqueta_2 == isolate(input$etiqueta_2))
+      }
+      if(isolate(input$etiqueta_3) != ""){
+        aux <- aux |>
+          filter(etiqueta_3 == isolate(input$etiqueta_2))
+      }
+      return(aux)
+    })
+
+# Visualizaciones ---------------------------------------------------------
 
     output$mapa <- leaflet::renderLeaflet({
-      aux <- solicitudes |>
+      aux <- bd() |>
         count(municipio)
 
       shp <- shp |>
@@ -156,18 +188,30 @@ mod_general_server <- function(id){
     })
 
     output$g_1 <- renderHighchart({
-      solicitudes |>
+      bd() |>
         count(municipio, sort = T) |>
         head(15) |>
-        hchart('bar', hcaes(x = municipio, y = n),
-               color = "#f77f00", name = "Menciones") |>
-        hc_xAxis(title = list(text = "Municipios")) |>
-        hc_yAxis(title = list(text = "Menciones")) |>
-        hc_title(text = "Top 15 municipios")
+        graficar_hchart(x_var = "municipio",
+                        y_var = "n",
+                        titulo = "Top 15 municipios",
+                        titulo_x = "Municipios",
+                        titulo_y = "Menciones")
+    })
+
+    output$g_3 <- renderHighchart({
+      aux <- if_else(tema_var() == "etiqueta_2", "Temas", "Subtemas")
+      bd() |>
+        count(!!rlang::sym(tema_var()), sort = T) |>
+        na.omit() |>
+        graficar_hchart(x_var = tema_var(),
+                        y_var = "n",
+                        titulo = stringr::str_glue("Principales {aux}"),
+                        titulo_x = aux,
+                        titulo_y = "Menciones")
     })
 
     output$l_tiempo <- renderHighchart({
-      hist_tiempo <- solicitudes |>
+      hist_tiempo <- bd() |>
         mutate(fecha = as.Date(fecha)) |>
         count(fecha)
 
@@ -190,7 +234,7 @@ mod_general_server <- function(id){
     })
 
     output$g_2 <- renderHighchart({
-      aux <- solicitudes |>
+      aux <- bd() |>
         count(etiqueta_1, sort = T) |>
         hchart('bar', hcaes(x = etiqueta_1, y = n),
                color = "#f77f00", name = "Menciones") |>

@@ -6,11 +6,17 @@
 #'
 #' @noRd
 
-graficar_hchart <- function(bd, x, y){
+graficar_hchart <- function(bd, x_var, y_var, color = "#f77f00",
+                            nombre_serie = "Menciones", titulo = "Gráfica",
+                            titulo_x = "Eje X", titulo_y = "Eje Y") {
   bd |>
-  hchart('bar', hcaes(x = {{x}}, y = {{y}}),
-         color = "#f77f00", name = "Menciones") |>
-    hc_xAxis(title = list(text = "Municipios")) |>
-    hc_yAxis(title = list(text = "Menciones")) |>
-    hc_title(text = "Top 15 municipios")
+  hchart(
+    type = "bar",
+    hcaes(x = !!sym(x_var), y = !!sym(y_var)), # Evalúa las columnas dinámicamente
+    color = color,
+    name = nombre_serie
+  ) |>
+    hc_xAxis(title = list(text = titulo_x)) |>
+    hc_yAxis(title = list(text = titulo_y)) |>
+    hc_title(text = titulo)
 }
