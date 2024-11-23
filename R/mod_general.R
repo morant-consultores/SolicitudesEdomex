@@ -141,14 +141,14 @@ mod_general_server <- function(id){
       leaflet(options = leafletOptions(zoomControl = FALSE)) |>
         addProviderTiles(provider = "CartoDB.Positron") |>
         addPolygons(data = shp,
-                    weight = 1.5,
+                    weight = 1,
                     stroke = TRUE,
-                    color = "white",
+                    color = "#353535",
                     fillColor = ~paleta(aux$log_n),
                     opacity = 0.3,
                     label = ~ nombre,
                     popup = ~ paste0("<strong>Municipio:</strong> ", nombre,
-                                     "<br><strong>Solicitudes:</strong> ", n),
+                                     "<br><strong>Solicitudes:</strong> ", scales::comma(n)),
                     fillOpacity = 0.8) |>
         addLegend('bottomright', pal = paleta, values = domain,
                   title = "Solicitudes - Escaladas") |>
