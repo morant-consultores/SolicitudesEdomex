@@ -161,14 +161,21 @@ mod_general_server <- function(id){
         count(municipio)
 
       shp <- shp |>
-        left_join(aux, join_by(nombre == municipio))
+        left_join(aux, join_by(nombre == municipio)) |>
+        tidyr::replace_na(list(n = 0))
 
       # Aplicar transformación logarítmica (asegurándote de evitar log(0))
-      aux <- aux |>
-        mutate(log_n = ifelse(n > 0, log(n), 0))
+      aux <- shp |>
+        as_tibble() |>
+        mutate(log_n = ifelse(n > 0, log(n), NA))
 
       domain <- c(min(aux$log_n, na.rm = TRUE), max(aux$log_n, na.rm = TRUE))
       paleta <- colorNumeric(c("#124559", "white", "#f77f00"), domain = domain)
+
+      quantiles <- quantile(aux$n, probs = seq(0, 1, 0.25), na.rm = TRUE) # Cuantiles (0%, 25%, 50%, 75%, 100%)
+      breaks <- unique(as.numeric(quantiles)) # Elimina duplicados en caso de datos extremos
+      labels <- scales::comma(breaks)         # Formato de etiquetas con separación de miles
+      colors <- paleta(log(breaks))
 
       leaflet(options = leafletOptions(zoomControl = FALSE)) |>
         addProviderTiles(provider = "CartoDB.Positron") |>
@@ -182,8 +189,10 @@ mod_general_server <- function(id){
                     popup = ~ paste0("<strong>Municipio:</strong> ", nombre,
                                      "<br><strong>Solicitudes:</strong> ", scales::comma(n)),
                     fillOpacity = 0.8) |>
-        addLegend('bottomright', pal = paleta, values = domain,
-                  title = "Solicitudes - Escaladas") |>
+        addLegend(position = 'bottomright',
+                  colors = colors, # Colores generados con los cuantiles
+                  labels = labels, # Etiquetas de los cuantiles
+                  title = "Solicitudes") |>
         leaflet.extras::addFullscreenControl()
     })
 
@@ -199,6 +208,7 @@ mod_general_server <- function(id){
     })
 
     output$g_3 <- renderHighchart({
+      validate(need(nrow(na.omit(bd()[tema_var()])) > 0, message = "No hay datos para mostrar"))
       aux <- if_else(tema_var() == "etiqueta_2", "Temas", "Subtemas")
       bd() |>
         count(!!rlang::sym(tema_var()), sort = T) |>
